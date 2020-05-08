@@ -4,6 +4,7 @@
 #include "stdafx.h"
 #include "ConfigurationLoader.h"
 #include "InstrumentationMethod.h"
+#include <iconv.h>
 
 HRESULT CConfigurationLoader::LoadConfiguration(_In_ BSTR bstrConfigPath, _In_ std::vector<CInstrumentationMethod*>& methods)
 {

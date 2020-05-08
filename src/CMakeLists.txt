@@ -119,8 +119,12 @@ macro (build_init build_language build_type)
     endif ()
 
     if(CMAKE_SYSTEM_PROCESSOR STREQUAL x86_64)
-        message("Detected Linux x86_64")
-        add_definitions(-DLINUX64)
+        if(CMAKE_SYSTEM_NAME STREQUAL Linux)
+            message("Detected Linux x86_64")
+            add_definitions(-DLINUX64)
+        else()
+            message("Detected Darwin x86_64")
+        endif()
         add_definitions(-D_M_AMD64)
         add_definitions(-DTARGET_AMD64)
     else (CMAKE_SYSTEM_PROCESSOR STREQUAL x86_64)
@@ -225,7 +229,7 @@ endfunction()
 # Set the project name
 project(ClrInstrumentationEngine)
 
-if(CMAKE_SYSTEM_NAME STREQUAL Linux)
+if(CMAKE_SYSTEM_NAME STREQUAL Linux OR CMAKE_SYSTEM_NAME STREQUAL Darwin)
     set(CLR_CMAKE_PLATFORM_UNIX 1)
 
     # Detect Linux ID
@@ -240,7 +244,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL Linux)
 
     set(PAL_SYMBOL_PREFIX clrie_)
     set(PAL_REDEFINES_HEADER ${GENERATED_INCLUDE_DIR}/pal_redefines.h)
-endif(CMAKE_SYSTEM_NAME STREQUAL Linux)
+endif()
 
 # Set flag to indicate if this will be a 64bit Linux build
 if(CMAKE_SYSTEM_PROCESSOR STREQUAL x86_64)
@@ -259,8 +263,7 @@ endif(CMAKE_SYSTEM_NAME STREQUAL Linux)
 
 
 if(CMAKE_SYSTEM_NAME STREQUAL Darwin)
-    message(FATAL_ERROR "Darwin build not supported.")
-    return()
+    set(PLAT_DLL_EXT "dylib")
 elseif(CMAKE_SYSTEM_NAME STREQUAL Linux)
     set(PLAT_DLL_EXT "so")
 else()
@@ -270,11 +273,15 @@ endif()
 
 # Add the PAL imported targets, redefining the necessary symbols on Linux
 # See Concord:/src/vsdbg/libvsbaseservices/PALRedefines.md for more info on this
-if (CMAKE_SYSTEM_NAME STREQUAL Linux)
-    if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL armv7l)
-        find_program(OBJCOPY ${TOOLCHAIN}-objcopy)
+if (CMAKE_SYSTEM_NAME STREQUAL Linux OR CMAKE_SYSTEM_NAME STREQUAL Darwin)
+    if (CMAKE_SYSTEM_NAME STREQUAL Linux)
+        if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL armv7l)
+            find_program(OBJCOPY ${TOOLCHAIN}-objcopy)
+        else()
+            find_program(OBJCOPY objcopy)
+        endif()
     else()
-        find_program(OBJCOPY objcopy)
+        find_program(OBJCOPY gobjcopy)
     endif()
     if(OBJCOPY STREQUAL "OBJCOPY-NOTFOUND")
         message(FATAL_ERROR "objcopy not found")
@@ -308,6 +315,30 @@ if (CMAKE_SYSTEM_NAME STREQUAL Linux)
 
     add_custom_target(pal_redefines DEPENDS ${REDEFINES_FILE})
 
+    function(add_library_pal target_name do_redefinition lib_location)
+        get_filename_component(lib_file_name ${lib_location} NAME)
+        set(redefine_lib_location ${CMAKE_CURRENT_BINARY_DIR}/${lib_file_name})
+
+        if(${do_redefinition})
+            # Copy the PAL lib from it's original location and do the redefine
+            add_custom_command(
+                OUTPUT ${redefine_lib_location}
+                COMMAND ${OBJCOPY} --redefine-syms ${REDEFINES_FILE} ${lib_location} ${redefine_lib_location}
+                DEPENDS pal_redefines ${lib_location} ${REDEFINES_FILE}
+                COMMENT "Redefining exported PAL symbols in ${lib_location}"
+            )
+        else()
+            configure_file(${lib_location} ${redefine_lib_location} COPYONLY)
+        endif(${do_redefinition})
+
+        add_custom_target(${target_name}_redefines DEPENDS ${redefine_lib_location})
+
+        add_library(${target_name} STATIC IMPORTED)
+        set_property(TARGET ${target_name} PROPERTY IMPORTED_LOCATION ${redefine_lib_location})
+
+        add_dependencies(${target_name} ${target_name}_redefines)
+    endfunction()
+elseif(CMAKE_SYSTEM_NAME STREQUAL Darwin)
     function(add_library_pal target_name do_redefinition lib_location)
         get_filename_component(lib_file_name ${lib_location} NAME)
         set(redefine_lib_location ${CMAKE_CURRENT_BINARY_DIR}/${lib_file_name})
