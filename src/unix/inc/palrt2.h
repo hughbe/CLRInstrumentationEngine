@@ -44,30 +44,40 @@ inline void * _recalloc(void *memblock, size_t num, size_t size)
 #define ULLONG_MAX    0xffffffffffffffffu       /* maximum unsigned long long int value */
 EXTERN_C PALAPI errno_t _ultow_s( unsigned long inValue, WCHAR* outBuffer, size_t inDestBufferSize, int inRadix );
 
+#if !__has_builtin(_InterlockedIncrement)
 inline LONG _InterlockedIncrement(LONG volatile * _Addend)
 {
     return InterlockedIncrement(_Addend);
 }
+#endif
 
+#if !__has_builtin(_InterlockedDecrement)
 inline LONG _InterlockedDecrement(LONG volatile * _Addend)
 {
     return InterlockedDecrement(_Addend);
 }
+#endif
 
+#if !__has_builtin(_InterlockedOr)
 inline LONG _InterlockedOr(LONG volatile * Destination, LONG Value)
 {
     return InterlockedOr(Destination, Value);
 }
+#endif
 
+#if !__has_builtin(_InterlockedAnd)
 inline LONG _InterlockedAnd(LONG volatile * Destination, LONG Value)
 {
     return InterlockedAnd(Destination, Value);
 }
+#endif
 
+#if !__has_builtin(_InterlockedExchange)
 inline LONG _InterlockedExchange(LONG volatile * Target, LONG Value)
 {
     return InterlockedExchange(Target, Value);
 }
+#endif
 
 // --- guid ---
 __inline int InlineIsEqualGUID(REFGUID rguid1, REFGUID rguid2)
@@ -82,7 +92,7 @@ __inline int InlineIsEqualGUID(REFGUID rguid1, REFGUID rguid2)
 
 // --- winerror ---
 #define ERROR_INVALID_THREAD_ID          1444L
-#define ERROR_ELEVATION_REQUIRED         740L
+#define ERROR_ELEVATIONO_REQUIRED         740L
 #define ERROR_ALREADY_INITIALIZED        1247L
 #define ERROR_BAD_ARGUMENTS              160L
 #define RPC_E_CALL_REJECTED              _HRESULT_TYPEDEF_(0x80010001L)
